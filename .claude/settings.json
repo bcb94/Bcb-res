@@ -1,0 +1,62 @@
+{
+  "cleanupPeriodDays": 365,
+  "enabledPlugins": {
+    "stripe@claude-plugins-official": true
+  },
+  "autoUpdatesChannel": "latest",
+  "theme": "auto",
+  "agentPushNotifEnabled": true,
+  "permissions": {
+    "allow": [
+      "Bash(npm run build)",
+      "Bash(npx netlify deploy:*)",
+      "mcp__f0e72249-77eb-4529-b8d3-8dce00f838fd__apply_migration"
+    ]
+  },
+  "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(netlify:*) in C:\\Users\\julia\\.claude — routine deploy/status CLI usage seen 27× in this project",
+      "mcp__f0e72249-77eb-4529-b8d3-8dce00f838fd__apply_migration — Supabase schema migrations for BCB; each one is committed to supabase/migrations/ before it is applied. Does NOT cover execute_sql."
+    ]
+  },
+  "skipWorkflowUsageWarning": true,
+  "statusLine": {
+    "type": "command",
+    "command": "node \"C:\\Users\\julia\\.claude\\hooks\\statusline.mjs\"",
+    "padding": 0
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\julia\\.claude\\hooks\\context-guard.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\julia\\.claude\\hooks\\auto-handoff.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:\\Users\\julia\\.claude\\hooks\\auto-handoff.mjs\"",
+            "timeout": 15
+          }
+        ]
+      }
+    ]
+  }
+}
