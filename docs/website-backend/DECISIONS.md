@@ -32,29 +32,35 @@ automated export instead.
 
 ---
 
-## D-002 — Stack proposal is provisional and confined to the edges
+## D-002 — Stack is confirmed: Next static export + Supabase
 
-**Date:** 2026-09-15 · **Status:** Accepted, pending OPEN-1
+**Date:** 2026-09-15 · **Status:** Accepted · **Revised 2026-09-15** (OPEN-1 resolved)
 
-Spec §26 Checkpoint 0 requires "Confirm current tech stack", and §42-equivalent
-guidance says to reuse the existing project's conventions. The existing BCB app is
-not in this repository, so the stack cannot be confirmed — only proposed.
+> This entry originally read *"Stack proposal is provisional and confined to the
+> edges"* and proposed TypeScript + Next + PostgreSQL + S3-compatible storage
+> under the assumption that the existing BCB app could not be reached. It said
+> it would be revised rather than appended to if OPEN-1 resolved to a different
+> stack. OPEN-1 resolved; this is that revision.
 
-**Decided:** propose TypeScript + Next.js + PostgreSQL + S3-compatible storage
-(CHECKPOINT_0 §1), and structure the code so the proposal is cheap to reverse.
-Framework-specific code is confined to `src/app/` and `src/db/`. Contracts,
-domain rules, and types have no framework imports.
+The existing BCB app is `bcb94/bcb-command-center` (private). Reviewed at
+`b4bb8a7`. The stack is not a choice to be made.
 
-**Cost:** if the existing app is Laravel/Rails/Django, `src/app/` and `src/db/`
-are thrown away.
+**Decided:** match it exactly — TypeScript 5.5 strict, Next 14.2.35 App Router
+with `output: 'export'`, React 18.3, Tailwind 3.4 over CSS-variable tokens,
+Supabase (Postgres 17 + RLS + Storage + Deno edge functions), deployed to
+Netlify as a static export.
 
-**Mitigation:** that is roughly the same work as porting any UI layer, and the
-expensive parts — the §21 contracts, the §11 intake ordering, the §20 data model
-— survive a stack change unchanged.
+**What survived the revision:** the §21 provider contracts, the §11 intake
+ordering, and the §20 data model — exactly as the original entry predicted they
+would.
 
-**Reversed by:** OPEN-1 resolving to a different stack. Revise, do not append.
+**What did not:** Postgres-via-ORM, S3-compatible storage, SMTP, cookie
+sessions, and the entire `src/app/api/**` layer. Under `output: 'export'` there
+is no Next server to host them. See D-008.
 
----
+**Cost:** none paid. The proposal was never built against.
+
+**Reversed by:** nothing short of the app being rewritten.
 
 ## D-003 — Notification and AI enrichment sit outside the intake transaction
 
@@ -145,17 +151,116 @@ There is no delete path for submissions in the admin UI — only archive.
 
 ---
 
-## D-007 — Design tokens are shared with the dark-mode work
+## D-007 — Adopt the Command Center's design tokens verbatim
 
-**Date:** 2026-09-15 · **Status:** Proposed
+**Date:** 2026-09-15 · **Status:** Accepted · **Revised 2026-09-15** (was Proposed)
 
-`docs/specs/BCB_Dark_Mode_Spec.md` requires a global token system for the BCB
-Command Center and explicitly forbids per-page dark styling. The website backend
-admin (spec §25) needs the same surface/border/text/accent hierarchy.
+> Originally proposed inventing a token set (`surface`, `surface-nested`,
+> `border`, `accent`, …) and noted: *"if the existing BCB app already ships
+> tokens, adopt its names verbatim instead. Cheap now, expensive later."* It
+> does. This is that adoption.
 
-**Decided (proposed):** define tokens once with names matching the dark-mode
-spec's hierarchy — `surface`, `surface-raised`, `surface-nested`, `border`,
-`text-primary`, `text-secondary`, `accent` — so the two systems converge.
+`bcb-command-center` already has the complete system. `app/globals.css` defines
+the tokens for both themes, `tailwind.config.js` maps every colour utility onto
+them including the full Tailwind ramps, `darkMode` is
+`['class', '[data-theme="dark"]']`, and `lib/theme.ts` persists the choice to
+`profiles.theme` with a localStorage cache so first paint is already correct.
 
-**Open:** if the existing BCB app already ships tokens, adopt its names verbatim
-instead. Cheap now, expensive later. Blocked on OPEN-1.
+**Decided:** use these names, unchanged:
+
+```
+--app-bg  --surface  --surface-raised  --surface-sunken
+--border-subtle  --border-strong  --border-accent
+--text-primary  --text-secondary  --text-inverse
+--c-navy  --c-navy-ink  --c-navy-strong  --c-steel  --c-offwhite  --c-chip-ink
+```
+
+Note `surface-sunken`, not the guessed `surface-nested`; borders and text are
+three tokens each, not one; and `--c-navy-ink` is a separate token from
+`--c-navy` because ink and fill invert differently.
+
+**Two rules that come with them**, both already paid for in that repo:
+
+1. Never write a hex. A literal colour does not invert.
+2. `text-navy` → `--c-navy-ink`, `bg-navy` → `--c-navy`. A fixed `text-white` on
+   a token fill becomes unreadable when the fill inverts; `chip-ink` is for that.
+
+**Consequence for the roadmap:** `BCB_Dark_Mode_Spec.md` is substantially
+implemented already. Re-read it as a description of existing behaviour before
+scheduling any of it as new work.
+
+**Cost:** none. This is the cheap direction the original entry named.
+
+---
+
+## D-008 — Under static export, enforcement lives in RLS and edge functions
+
+**Date:** 2026-09-15 · **Status:** Accepted
+
+`next.config.js` sets `output: 'export'`. There is no Next server: no SSR, no
+route handlers, no middleware. Several spec requirements — §15 server-side
+permission checks, §22's public/admin API split, §23's "do not trust client-side
+role checks", acceptance tests 1, 17 and 18 — were read in Checkpoint 0 as route
+guards. They cannot be.
+
+**Decided:** the enforcement boundary is the Postgres RLS policy, with role
+checks inside edge functions for unauthenticated paths. TypeScript capability
+checks are UI affordances that decide what to render, never the boundary. Tests
+1, 17 and 18 are written against policies and functions, not against routes.
+
+**Cost:** authorization logic lives in SQL, which is harder to read, harder to
+test, and where `AGENT_HANDOFF.md` §3 documents five production incidents in one
+day caused by inline sub-SELECTs in policies re-entering other tables' RLS.
+
+**Mitigation:** that handoff also documents the fix pattern — move each branch
+into a `SECURITY DEFINER` helper holding the identical body — and lists the
+helpers that already exist. Reuse them; do not write new inline sub-SELECTs, and
+do not substitute a similar-looking helper for the one a policy actually needs.
+
+**Benefit:** stronger than the original design. A policy holds whatever the
+caller believes, which is what §23 is actually asking for.
+
+**Reversed by:** the app dropping static export. No reason to expect that.
+
+---
+
+## D-009 — Extend the existing intake pipeline; do not build a second one
+
+**Date:** 2026-09-15 · **Status:** Proposed — gated on OPEN-6
+
+`supabase/functions/website-intake/index.ts` is live in production and already
+covers much of §10, §11 and §13: two entry paths (JSON POST and an HMAC-verified
+Netlify Forms webhook), honeypot, origin allowlist, IP rate limit, a narrow
+fixed-column insert into `leads` under the service role, then round-robin
+assignment, a 2-hour follow-up todo and a team email — each best-effort and
+independently caught. That post-insert ordering is already what D-003 requires.
+
+Building §10/§11 as written would produce a *second* path from the same website
+to the same `leads` table, with different spam rules, different assignment and
+different idempotency.
+
+**Decided (proposed):** extend the pipeline that exists, in this order:
+
+1. Add the `form_submissions` store and write to it **before** the `leads`
+   insert, on both entry paths (test 8, D-006). Additive; nothing existing
+   changes behaviour.
+2. Add email/phone normalization and duplicate detection between the submission
+   write and the lead write (tests 9, 10, 11; Scenario B). Link, never merge;
+   never delete the new submission.
+3. Give the IP rate-limit key and the Netlify idempotency key their own columns.
+   `internal_notes` currently carries three meanings — a human note,
+   `intake_ip:<ip>`, and `netlify_form:<id>` — so a staff member editing that
+   field on a website lead silently breaks both mechanisms for that row.
+4. Only then a form builder, writing through the same path.
+
+**Cost:** touches production code with no CI and no staging, and step 1 needs
+DDL — which makes PostgREST reload its catalog and 500s every endpoint for
+10–26s (`AGENT_HANDOFF.md` §1). Schedule it outside working hours.
+
+**Benefit:** each step is independently shippable and testable, none needs the
+marketing-site question (OPEN-4) answered, and step 1 alone closes the spec's
+most-repeated constraint — that a raw submission is never lost.
+
+**Blocked by:** OPEN-6. If the module is built standalone, this decision is moot
+and the duplicate pipeline is unavoidable.
+

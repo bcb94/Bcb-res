@@ -28,15 +28,41 @@ doesn't, this file is wrong.
 The merge boundary from spec §21. Standalone implementations are disposable; the
 contracts are not.
 
-| Contract | Standalone impl | Future BCB impl | Status | Notes |
+> **Updated 2026-09-15.** Every "future BCB impl" below was a placeholder until
+> `bcb94/bcb-command-center` was located. All seven now name a real target,
+> reviewed at `b4bb8a7`. If the module is built inside that app (CHECKPOINT_0
+> OPEN-6, option B), this table stops describing a merge and starts describing
+> what to call instead of writing.
+
+| Contract | Standalone impl | Real BCB implementation | Status | Notes |
 |---|---|---|---|---|
-| `AuthProvider` | `StandaloneAuthProvider` | existing BCB Team/Auth | not started | §29 mapping: `team_users`/auth → existing Team/Auth. Map BCB roles → capability set (D-004). |
-| `LeadProvider` | `TemporaryLeadAdapter` | existing BCB Leads module | not started | §29: `temp_leads` → Leads. Reconcile before import; §30 forbids bulk duplicate creation. |
-| `TeamProvider` | `StandaloneTeamProvider` | existing BCB Team | not started | Notification recipients resolve through here, never hard-coded (§13). |
-| `FileProvider` | `LocalFileProvider` | existing BCB Documents | not started | §30: replace only if BCB document storage should own lead uploads. Private-by-default must survive (§23). |
-| `NotificationProvider` | `SmtpNotificationProvider` | BCB notification center | not started | §29: "Existing/future BCB notification center" — may not exist yet; keep standalone impl if so. |
-| `AuditProvider` | `DbAuditProvider` | BCB audit log | not started | §19 revision history + §23 audit requirements. |
-| `EnrichmentProvider` | `NoopEnrichmentProvider` | BCB AI services | not started | Must stay optional and non-blocking (§12, D-003). |
+| `AuthProvider` | `StandaloneAuthProvider` | Supabase Auth + `profiles.role` + `components/AuthGate.tsx` | target identified | No password path — GoTrue owns credentials. `authenticate()` should be dropped; see CHECKPOINT_0 §4 amendment. |
+| `LeadProvider` | `TemporaryLeadAdapter` | `leads` table + `app/(app)/leads/` + `assign_lead_round_robin()` | **already live** | `temp_leads` may never need to exist. The lead half of this spec is in production — see D-009. |
+| `TeamProvider` | `StandaloneTeamProvider` | `profiles` + `lib/roles.ts` (`INTERNAL_ROLES`, mirrors `private.is_internal()`) | target identified | Do not re-type the role arrays; `lib/roles.ts` documents why (a duplicated list is how a send-invoice endpoint admitted `price_book_manager`). |
+| `FileProvider` | `LocalFileProvider` | Supabase Storage + `app/(app)/documents/` + storage RLS helpers | target identified | `private.can_read_portal_document_object` is the existing private-by-default pattern (§23). |
+| `NotificationProvider` | `SmtpNotificationProvider` | notifications tables → `private.enqueue_message_push()` → `pg_net` → `send-push`; email via `send-*` edge functions | **exists** | No SMTP anywhere in this app. Push fails silently and safely when a Vault entry is missing — by design, not a bug. |
+| `AuditProvider` | `DbAuditProvider` | `lib/auditLog.ts` | target identified | §19 revision history + §23 audit requirements. |
+| `EnrichmentProvider` | `NoopEnrichmentProvider` | `ai-assistant`, `builder-ai`, `blue-*` edge functions | target identified | Must stay optional and non-blocking (§12, D-003). |
+
+## What already exists in production
+
+Recorded so that no checkpoint rebuilds it. Reviewed at `b4bb8a7`.
+
+| Spec area | Status in the Command Center |
+|---|---|
+| §10 public form intake | **Live** — `supabase/functions/website-intake/` (JSON POST + HMAC-verified Netlify Forms webhook) |
+| §10 spam / rate limiting | **Live** — honeypot on both paths, origin allowlist, 5 leads / 10 min per IP (hard-coded) |
+| §11 lead creation | **Live** — narrow fixed-column insert into `leads`, service role, `lead_no` minted |
+| §11 assignment | **Live** — `assign_lead_round_robin()` picks the intake person idle longest |
+| §13 team alert | **Live** — team email naming the owner, plus a 2-hour follow-up todo |
+| §12/§27.14 failure isolation | **Live** — every post-insert step independently caught; a failure never 500s the customer |
+| §25 design tokens, light/dark | **Live** — see D-007 |
+| §15 auth, roles | **Live** — Supabase Auth, 13 roles, RLS |
+| §10 raw submission store | **Missing** — the highest-value gap (D-009 step 1, test 8) |
+| §11 duplicate detection | **Missing** — only Netlify-submission-id idempotency (tests 9/10/11, Scenario B) |
+| §7/§19 CMS, page versions, publish state | **Missing** — genuinely new work |
+| §10 form builder | **Missing** — genuinely new work |
+| §16 uploads on intake | **Missing** |
 
 ## Temporary tables
 
@@ -45,7 +71,7 @@ stays as Website-module tables in the unified backend.
 
 | Table | Fate at merge | Risk |
 |---|---|---|
-| `temp_leads` | Migrate into BCB Leads, then drop | **Highest-risk step in the merge.** Reconcile against existing BCB leads first (§30). Do not bulk-insert. |
+| `temp_leads` | Migrate into BCB Leads, then drop | **Highest-risk step in the merge.** Reconcile against existing BCB leads first (§30). Do not bulk-insert. **May be avoidable entirely** — `leads` already exists and already receives website leads (D-009). |
 | `lead_submission_links` | Repoint to BCB lead IDs, keep | Must survive — it is how a submission traces to a lead. |
 | `team_users` | Drop; map to BCB users | Preserve a user-ID mapping table through the migration or audit history loses its authors. |
 | `roles` / `permissions` / `role_permissions` | Drop; map to BCB roles | Capability set must map 1:1 or §27.18 regresses. |
@@ -79,6 +105,9 @@ Recorded so they are not mistaken for oversights.
 Three BCB specs independently require auth, capabilities, file storage,
 notifications, and design tokens. Building them three times is the main avoidable
 cost in this roadmap (CHECKPOINT_0 OPEN-2).
+
+**Largely averted, as of 2026-09-15.** The Command Center already owns all five.
+The duplication risk now only materialises if a module is built *outside* it.
 
 | Shared concern | Website Backend | Builders Module | Accounting Module |
 |---|---|---|---|

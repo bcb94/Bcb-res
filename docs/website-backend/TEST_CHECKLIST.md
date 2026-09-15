@@ -29,7 +29,10 @@ not when the code that should satisfy it has been written.
 
 Checkpoint 0 is marked verified on the narrow basis that its exit criterion is
 documentary. Its two substantive findings — no BCB app code in this repo, stack
-unconfirmable — are recorded as OPEN-1 and must be resolved before Checkpoint 1.
+unconfirmable — were recorded as OPEN-1. **OPEN-1 is now resolved**
+(`bcb94/bcb-command-center`); CHECKPOINT_0 §§0–2, 5, 6 are revised accordingly.
+Checkpoint 1 is gated on OPEN-6 (where the module gets built), Checkpoint 2 on
+OPEN-4 (where the marketing site lives).
 
 ---
 
@@ -41,8 +44,13 @@ Each maps to the checkpoint that should make it pass.
 
 - [ ] **1.** Admin login is required for all internal website-management routes. *(CP1)*
       Verify server-side, per route group — not by hiding nav links.
+      **Revised (D-008):** the app is a static export, so there is no route to guard.
+      Assert against the **RLS policy** and the edge function, not middleware.
+      `AuthGate` is a client-side convenience and proves nothing.
 - [ ] **18.** A user without publish permission cannot publish. *(CP2)*
       Assert on the API response, not the UI. Pairs with Scenario D.
+      **Revised (D-008):** assert on the PostgREST/RPC response under that user's
+      JWT — the policy is what must refuse, not the button that is hidden.
 
 ### Content management
 
@@ -65,8 +73,13 @@ Each maps to the checkpoint that should make it pass.
       Exactly §3: First Name, Last Name, Email, Phone, Service Needed, Project Address, Project Description.
 - [ ] **8.** A valid submission is permanently recorded before downstream processing. *(CP4)*
       The ordering guarantee from D-003. Test by failing every downstream step.
+      **Fails against production today** — `website-intake` writes no raw
+      submission at all, so a field `leads` has no column for is lost. D-009 step 1
+      is the fix and is the single highest-value change in this spec.
 - [ ] **9.** Exact email/phone duplicates are detected. *(CP5)*
       Normalize first (§11): casing, `+1`, punctuation, whitespace.
+      **Fails against production today** — the only idempotency is on the Netlify
+      submission id. Two submissions from one email create two unrelated leads.
 - [ ] **10.** Duplicate logic never deletes the new raw submission. *(CP5)*
 - [ ] **11.** New submissions can create temporary leads. *(CP5)*
 - [ ] **16.** Uploaded lead files are private by default. *(CP4/CP7)*
@@ -99,7 +112,7 @@ Each maps to the checkpoint that should make it pass.
       Test Customer A · Framing Construction · Dickson, TN · "New detached garage framing request".
       Expect: new submission, new lead, framing tag/service, alerts sent.
 
-- [ ] **Scenario B — Duplicate email.**
+- [ ] **Scenario B — Duplicate email.** *(fails against production today — see test 9)*
       Resubmit the same email with a different project description.
       Expect: second submission preserved; probable existing lead flagged or linked.
       Must **not** silently create a duplicate or overwrite the first lead.
@@ -130,4 +143,9 @@ most likely to erode quietly.
 - [ ] No call site branches on a role name instead of a capability (D-004).
 - [ ] Nothing outside `providers/registry.ts` imports from `providers/` or `db/` (D-005).
 - [ ] Public form is rate-limited and spam-protected (§23).
+      *(already true: honeypot + origin allowlist + 5/10min per IP in `website-intake`)*
+- [ ] No role array is re-typed in an edge function without updating `lib/roles.ts`
+      and the matching `private.*()` database function first.
+- [ ] No new inline sub-SELECT in an RLS policy — use the existing
+      `SECURITY DEFINER` helpers (D-008, `AGENT_HANDOFF.md` §3).
 - [ ] Every visible primary control works — no dead-end UI.
