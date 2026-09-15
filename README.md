@@ -10,13 +10,14 @@ docs/
 │   ├── BCB_Website_Backend_Master_Build_Spec.md
 │   ├── BCB_Builders_Module_Spec.md
 │   ├── BCB_Accounting_Module_Spec.md
-│   └── BCB_Dark_Mode_Spec.md
-├── website-backend/      # active build: Website Backend
+│   ├── BCB_Dark_Mode_Spec.md
+│   └── README.md
+└── website-backend/      # active build: Website Backend
     ├── CHECKPOINT_0.md   # architecture & repository review  ← current state
     ├── DECISIONS.md      # architecture decision log
-│   ├── INTEGRATION_NOTES.md
-│   └── TEST_CHECKLIST.md
-└── ...
+    ├── INTEGRATION_NOTES.md
+    └── TEST_CHECKLIST.md
+
 proposals/
 └── checkpoint-4-raw-submissions/   # ready to review, NOT applied
 ```
