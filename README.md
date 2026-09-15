@@ -11,11 +11,14 @@ docs/
 │   ├── BCB_Builders_Module_Spec.md
 │   ├── BCB_Accounting_Module_Spec.md
 │   └── BCB_Dark_Mode_Spec.md
-└── website-backend/      # active build: Website Backend
+├── website-backend/      # active build: Website Backend
     ├── CHECKPOINT_0.md   # architecture & repository review  ← current state
     ├── DECISIONS.md      # architecture decision log
-    ├── INTEGRATION_NOTES.md
-    └── TEST_CHECKLIST.md
+│   ├── INTEGRATION_NOTES.md
+│   └── TEST_CHECKLIST.md
+└── ...
+proposals/
+└── checkpoint-4-raw-submissions/   # ready to review, NOT applied
 ```
 
 ## Current state
@@ -56,6 +59,14 @@ and what acceptance tests 8, 9, 10 and 11 are about.
 | OPEN-4 | Where does `bcb.blue`, the marketing site, live? | Checkpoints 2, 7, 8 |
 
 See `docs/website-backend/CHECKPOINT_0.md` § "Open questions".
+
+### Ready to review
+
+`proposals/checkpoint-4-raw-submissions/` closes the largest gap — a migration
+and an edge-function change plan that make the live pipeline keep what the
+customer actually sent. Additive, separately shippable, and **not applied**: it
+carries a three-query preflight because it was written without live database
+access. See its `README.md`.
 
 ## Starting a session
 
