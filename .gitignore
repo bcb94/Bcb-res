@@ -1,0 +1,6 @@
+# Scratch state written by the hooks in .claude/hooks/
+.claude/.state/
+.claude/HANDOFF.md
+
+# Local, per-machine Claude Code overrides
+.claude/settings.local.json
